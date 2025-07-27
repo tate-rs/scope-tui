@@ -7,6 +7,29 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use scope::app::App;
 use scope::cfg::{ScopeArgs, ScopeSource};
 
+fn print_devices(devices: cpal::OutputDevices<cpal::Devices>) {
+	use cpal::traits::DeviceTrait;
+
+	for dev in devices {
+		println!("> {}", dev.name().unwrap());
+		for config in dev.supported_input_configs().unwrap() {
+			let bufsize = match config.buffer_size() {
+				cpal::SupportedBufferSize::Range { min, max } => (*min, *max),
+				cpal::SupportedBufferSize::Unknown => (0, 0),
+			};
+			println!(
+				"  + {}ch {}-{}hz {}-{}buf ({})",
+				config.channels(),
+				config.min_sample_rate().0,
+				config.max_sample_rate().0,
+				bufsize.0,
+				bufsize.1,
+				config.sample_format()
+			);
+		}
+	}
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let mut args = ScopeArgs::parse();
 	args.opts.tune();
@@ -34,26 +57,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 			list,
 		} => {
 			if list {
-				use cpal::traits::{DeviceTrait, HostTrait};
+				use cpal::traits::HostTrait;
 				let host = cpal::default_host();
-				for dev in host.input_devices().unwrap() {
-					println!("> {}", dev.name().unwrap());
-					for config in dev.supported_input_configs().unwrap() {
-						let bufsize = match config.buffer_size() {
-							cpal::SupportedBufferSize::Range { min, max } => (*min, *max),
-							cpal::SupportedBufferSize::Unknown => (0, 0),
-						};
-						println!(
-							"  + {}ch {}-{}hz {}-{}buf ({})",
-							config.channels(),
-							config.min_sample_rate().0,
-							config.max_sample_rate().0,
-							bufsize.0,
-							bufsize.1,
-							config.sample_format()
-						);
-					}
-				}
+				println!("{}\nInput devices:\n{}", "-".repeat(45), "-".repeat(45));
+				print_devices(host.input_devices().unwrap());
+				println!("{}\nOutput devices:\n{}", "-".repeat(45), "-".repeat(45));
+				print_devices(host.output_devices().unwrap());
 				return Ok(());
 			}
 			scope::input::cpal::DefaultAudioDeviceWithCPAL::instantiate(

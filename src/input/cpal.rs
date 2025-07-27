@@ -35,10 +35,20 @@ impl DefaultAudioDeviceWithCPAL {
 	) -> Result<Box<impl super::DataSource<f64>>, AudioDeviceErrors> {
 		let host = cpal::default_host();
 		let device = match device {
-			Some(name) => host
-				.input_devices()?
-				.find(|x| x.name().as_deref().unwrap_or("") == name)
-				.ok_or(AudioDeviceErrors::NotFound)?,
+			Some(name) => {
+				let output_device = host
+					.output_devices()?
+					.find(|x| x.name().as_deref().unwrap_or("") == name)
+					.ok_or(AudioDeviceErrors::NotFound);
+
+				if let Ok(dev) = output_device {
+					dev
+				} else {
+					host.input_devices()?
+						.find(|x| x.name().as_deref().unwrap_or("") == name)
+						.ok_or(AudioDeviceErrors::NotFound)?
+				}
+			}
 			None => host
 				.default_input_device()
 				.ok_or(AudioDeviceErrors::NotFound)?,
